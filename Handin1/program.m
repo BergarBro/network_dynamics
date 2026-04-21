@@ -1,0 +1,208 @@
+%% Centrality
+
+clc
+clear
+
+% Import data
+load('IOdownload.mat')
+n = 47;
+W_s = io.swe2000;
+W_i = io.idn2000;
+
+% Choosing what country to study (W_s for Sweden, W_i for Indonesia)
+W = W_i;
+
+% In/Out degree Centrality 
+w_out = W*ones(n,1);
+w_in = W'*ones(n,1);
+
+disp("Indegree Centrality")
+indegree = print_most_central(w_in, name, 3);
+
+disp("Outdegree Centrality")
+outdegree = print_most_central(w_out, name, 3);
+
+% Eigenvector Centrality
+G = digraph(W);
+bins = conncomp(G);     % Computing the biggest connected componant
+biggest_bin = mode(bins);
+indices_cc = find(bins == biggest_bin); % Keeping the biggest connected componant
+name_cc = name(indices_cc);
+W_cc = W(indices_cc,indices_cc);
+
+[v, D] = eig(W_cc');    % Finding the eigenvectors
+lam = diag(D);          % Finding the eigen values
+lam(imag(lam) ~= 0) = 0; % Keeping only real eigen values
+[lam_max, index] = max(lam); % Finding the dominant eigenvalue
+z = v(:, index);
+z = z./sum(z);  % Normalizing the eigenvector
+
+disp("Eigenvector Centrality")
+eigen = print_most_central(z, name_cc, 3);
+
+
+% Katz Centrality
+n_cc = size(W_cc,1);
+beta = 0.15;
+mu_1 = ones(n_cc,1);    % mu = unit vector
+mu_2 = zeros(n_cc,1);   
+mu_2(indices_cc == 31) = 1; % mu = targeting sector 31
+mus = [mu_1 mu_2]; 
+zs = zeros(n_cc,2);
+
+for i = 1:2     % Compute centrality for each mu
+    mu = mus(:,i);
+    W_ = (eye(n_cc) - 1/lam_max*(1 - beta)*W_cc');
+    z = W_\mu*beta;
+    z = z./sum(z);  % Normalizing the eigenvector
+    zs(:,i) = z;
+end
+
+disp("Katz Centrality (" + char(181) + " = unit vector)")
+katz = print_most_central(zs(:,1), name_cc, 3);
+
+disp("Katz Centrality (" + char(181) + " = targeted vector)")
+katz_different = print_most_central(zs(:,2), name_cc, 3);
+
+%% PageRank
+
+clc
+clear
+
+% Import data
+load("twitter.csv")
+load("users.csv")
+W = spconvert(twitter);
+n = size(W,1);
+W(n,n) = 0; % Making the sparce matrix be square
+W(1,1) = 1; % Adding a selfloop to the sink
+
+% Compute the P matrix (normelized weigth matrix)
+w_out = W*sparse(ones(n,1));
+D = diag(w_out);
+P = D\W;
+
+% Define values for PageRank Centrality
+beta = 0.15;
+mu = ones(n,1);
+iterations = 10;
+n_nodes = 5;
+most_central = zeros(5,iterations);
+
+% Compute PageRank iteratively
+z = 0;
+for i = 0:iterations
+    z = z + beta*(1 - beta)^i*P'^i*mu;
+    most_central(:,i+1) = print_most_central(z, 1:n, n_nodes, 1);
+end
+
+% Compute PageRank exact
+A = (eye(n) - (1 - beta)*P');
+z = A\mu*beta;
+z = z./sum(z);
+
+% Making nice print
+disp("PageRank Centrality (iteratively)")
+str = strings(n_nodes + 1,1);
+str(1) = sprintf(" %-11s", "Iteration |");
+str(2) = sprintf(" %-11s", "Node Rank |");
+for k = 2:n_nodes
+    str(1 + k) = sprintf(" %11s", "|");
+end
+for i = 1:iterations
+    str(1) = str(1) + sprintf(" %4d", i);
+    for j = 1:n_nodes
+        str(1+j) = str(1+j) + sprintf(" %4d", most_central(j,i));
+    end
+end
+disp(join(str, newline))
+disp(" ")
+
+disp("PageRank Centrality (exact)")
+print_most_central(z, 1:n, 5);
+
+% Discrete-Time Consensus Algorithm
+% Define values
+start = 0.5*sparse(ones(n,1));  % Initial vector
+stub_1 = [1 2];             % List of stubborn node with value 1
+stub_0 = [112 9 26 144];    % List of stubborn node with value 0
+start(stub_1) = 1;      % Initialiting stubborn nodes
+start(stub_0) = 0;      % Initialiting stubborn nodes
+iter = start;
+step = 1;
+tol = 0.0001;
+while 1     % Runs until tolerance is achieved
+    step = step + 1;
+    start = P*start;    % One step in the algorithm
+    start(stub_1) = 1;  % Keep stubborn nodes stubborn
+    start(stub_0) = 0;  % Keep stubborn nodes stubborn
+    iter(:,step) = start;
+    
+    % When the maxumim change from one step to another is smaler then
+    % the tolerance the loop stops
+    if tol > max(abs(iter(:,end-1) - iter(:,end)))
+        break
+    end
+end
+
+if isempty(stub_0) % Fix string when stub_0 is empty
+    st_0 = "-";
+else
+    st_0 = join(string(stub_0),", ");
+end
+
+if isempty(stub_1) % Fix string when stub_1 is empty
+    st_1 = "-";
+else
+    st_1 = join(string(stub_1),", ");
+end
+
+% Making nice plots
+f1 = figure;
+s = surf(iter(:,1:200));
+title(strcat("Stubborn(1) = [",st_1,"], Stubborn(0) = [",st_0,"] and rest start at 0.5"))
+xlabel("Timesteps")
+ylabel("Nodes")
+zlabel("Value")
+
+f2 = figure;
+subplot(1,2,1)
+step_size = round(step/100);
+for t = 1:step_size:step  
+    histogram(iter(:,t), 'BinWidth', 0.05);
+
+    xlim([0 1]); % keep axes stable
+    ylim([0 7000]);
+    title(strcat("Stubborn(1) = [",st_1,"] and Stubborn(0) = [",st_0,"], t = ",string(t)))
+    xlabel("Values")
+    ylabel("Amounts")
+
+    drawnow;
+end
+
+subplot(1,2,2)
+points = round(rand(1,100)*n + 1);
+plot(iter(points,:)')
+title(strcat("Stubborn(1) = [",st_1,"], Stubborn(0) = [",st_0,"] and handful of nodes"))
+xlabel("Timesteps")
+ylabel("Values")
+
+
+function most = print_most_central(z, name, n, mute)
+    arguments
+        z    (1,:)
+        name (1,:)
+        n    (1,1)   
+        mute (1,1) = 0
+    end
+    z = abs(z);
+    [values, indices] = sort(z,'descend');
+    most = name(indices(1:n));
+    if ~mute
+        fprintf(" %-4s | %-36s | %-10s \n","Rank", "Node", "Value")
+        for i = 1:n
+            fprintf(" %-4s   %-36s   %-10s \n",num2str(i), string(name(indices(i))), num2str(values(i)))
+        end
+        fprintf("\n")
+    end
+end
