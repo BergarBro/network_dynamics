@@ -3,6 +3,7 @@
 clc
 clear
 
+% Import data
 load('traffic.mat','-ascii')
 %traffic
 load('capacities.mat', '-ascii')
@@ -12,10 +13,26 @@ load('traveltime.mat', '-ascii')
 load('flow.mat', '-ascii')
 %flow
 
+% Seting variables
 n = size(traffic,1);
 m = length(flow);
 
+B = traffic;
+nu = zeros(n,1);
 c = capacities;
+l = traveltime;
+% Defining all cost functions
+delay       = @(l,c,f) l.*inv_pos(1-f.*inv_pos(c));
+delay_f     = @(l,c,f) l.*c.*(1.*inv_pos(1 - f.*inv_pos(c)) - 1);
+delay_int   = @(l,c,f) l.*c.*(1 - log(1 - f.*inv_pos(c)));
+delay_der   = @(l,c,f) l.*inv_pos(c.*(1 - f.*inv_pos(c)).^2);
+delay_add       = @(l,c,f) delay_f(l,c,f) - f.*l;
+delay_add_int   = @(l,c,f) delay_int(l,c,f) - f.*l;
+delay_add_der   = @(l,c,f) delay_der(l,c,f);
+
+func2run = [1 1 1 1];
+plot_    = 0;
+prints   = 1;
 
 A_time = zeros(n,n);
 A_capacity = zeros(n,n);
@@ -35,34 +52,28 @@ G_capacity = digraph(A_capacity);
 %plot_grapth_2(A_capacity,s,t,c,0)
 %plot(g)
 
-maxflow(G_capacity,1,17)
+traffic_flow = B*flow;
+ext_flow = sum(traffic_flow,2);
 
-traffix_flow = traffic*flow;
-ext_flow = sum(traffix_flow,2);
+fprintf("Exogenous Flow: \n")
+fprintf(" %-4s | %-10s  \n", "Node", "External Flow")
+for i = 1:length(ext_flow)
+    fprintf(" %-4i   %-10i \n", i, ext_flow(i))
+end
+fprintf("\n")
 
-
-
-B = traffic;
-nu = zeros(n,1);
 nu(1) = ext_flow(1);
 nu(n) = -ext_flow(1);
-c = capacities;
-l = traveltime;
-delay       = @(l,c,f) l.*inv_pos(1-f.*inv_pos(c));
-delay_f     = @(l,c,f) l.*c.*(1.*inv_pos(1 - f.*inv_pos(c)) - 1);
-delay_int   = @(l,c,f) l.*c.*(1 - log(1 - f.*inv_pos(c)));
-delay_der   = @(l,c,f) l.*inv_pos(c.*(1 - f.*inv_pos(c)).^2);
-delay_add       = @(l,c,f) delay_f(l,c,f) - f.*l;
-delay_add_int   = @(l,c,f) delay_int(l,c,f) - f.*l;
-delay_add_der   = @(l,c,f) delay_der(l,c,f);
 
-func2run = [1 0 0 0];
-plot_    = [0 0 0 0];
-prints   = [1 0 0 0];
+max_flow = maxflow(G_capacity,1,17);
+
+fprintf("Max Flow of network: ")
+fprintf(int2str(max_flow))
+fprintf("\n \n")
 
 disp("Free Flow:")
-d = delay(l,c,traveltime);
-print_shortest_path(s,t,d)
+print_shortest_path(s,t,l,c,delay,zeros(m,1))
+fprintf("\n")
 
 if func2run(1)
     cvx_begin quiet
@@ -73,19 +84,20 @@ if func2run(1)
             0 <= f <= c
     cvx_end
     f_opt = f;
-    if plot_(1)
+
+    if plot_
         plot_grapth_1(s,t,f_opt,c)
     end
 
-    if prints(1)
+    if prints
         disp("Social Optimum: ")
-        d = delay(l,c,f_opt);
-        print_shortest_path(s,t,d)
+        print_shortest_path(s,t,l,c,delay,f_opt)
+        fprintf("\n")
     end
 end
 
 if func2run(2)
-    cvx_begin
+    cvx_begin quiet
         variable f(m)
         minimize sum(delay_int(l,c,f))
         subject to
@@ -94,16 +106,21 @@ if func2run(2)
     cvx_end
     f_wardrop = f;
     
-    plot_grapth_1(s,t,f_wardrop,c)
+    if plot_
+        plot_grapth_1(s,t,f_wardrop,c)
+    end
 
-    [path,time] = shortestpath(graph(s,t,delay(l,c,f_opt)),1,17)
-    times_in_minutes = 60*time
+    if prints
+        disp("Wardrop Equilibrium: ")
+        print_shortest_path(s,t,l,c,delay,f_wardrop)
+        fprintf("\n")
+    end
 end
 
 if func2run(3)
     omega = f_opt.*delay_der(l,c,f_opt);
     
-    cvx_begin
+    cvx_begin quiet
         variable f(m)
         minimize sum(delay_int(l,c,f) + omega.*f)
         subject to
@@ -112,13 +129,21 @@ if func2run(3)
     cvx_end
     f_wardrop_tolls = f;
     
-    plot_grapth_1(s,t,f_wardrop_tolls,c)
+    if plot_
+        plot_grapth_1(s,t,f_wardrop_tolls,c)
+    end
 
-    total_diff = sum(abs(f_opt-f_wardrop_tolls));
+    if prints
+        disp("Wardrop Equilibrium (with tolls): ")
+        print_shortest_path(s,t,l,c,delay,f_wardrop_tolls)
+        total_diff = sum(abs(f_opt-f_wardrop_tolls));
+        fprintf("Difference between Optimum and Wardrop with tolls: %.5f \n", total_diff)
+        fprintf("\n")
+    end
 end
 
 if func2run(4)
-    cvx_begin
+    cvx_begin quiet
         variable f(m)
         minimize sum(delay_add(l,c,f))
         subject to
@@ -127,11 +152,13 @@ if func2run(4)
     cvx_end
     f_opt_add = f;
     
-    plot_grapth_1(s,t,f_opt_add,c)
+    if plot_
+        plot_grapth_1(s,t,f_opt_add,c)
+    end
 
     omega_add = f_opt_add.*delay_add_der(l,c,f_opt_add);
 
-    cvx_begin
+    cvx_begin quiet
         variable f(m)
         minimize sum(delay_add_int(l,c,f) + omega_add.*f)
         subject to
@@ -140,9 +167,17 @@ if func2run(4)
     cvx_end
     f_wardrop_tolls_add = f;
     
-    plot_grapth_1(s,t,f_wardrop_tolls_add,c)
+    if plot_
+        plot_grapth_1(s,t,f_wardrop_tolls_add,c)
+    end
 
-    total_diff_add = sum(abs(f_wardrop_tolls_add - f_opt_add))
+    if prints
+        disp("Wardrop Equilibrium (with tolls and addition delay): ")
+        print_shortest_path(s,t,l,c,delay,f_wardrop_tolls_add)
+        total_diff_add = sum(abs(f_wardrop_tolls_add - f_opt_add));
+        fprintf("Difference between Optimum and Wardrop with tolls and addition delay: %.5f \n", total_diff_add)
+        fprintf("\n")
+    end
 end
 
 
@@ -226,19 +261,21 @@ function plot_flow(G,f,s,t,c,show_cap)
     set(gca, 'color', 'none');
 end
 
-function print_shortest_path(s,t,d)
+function print_shortest_path(s,t,l,c,delay,flow)
+    d = delay(l,c,flow);
     [path,time] = shortestpath(graph(s,t,d),1,17);
     times_in_minutes = 60*time;
+    time_spent = sum(d.*flow)*60;
 
     str_path = "";
     for i = path
         str_path = str_path + int2str(i) + " ";
     end
 
-    disp('Shortest Path:')
-    disp(str_path)
-    disp("")
-    disp("Time to travel shortest path:")
-    fprintf("%.2f minutes \n",times_in_minutes)
-    fprintf("\n")
+    fprintf("Fastest Path: %s \n", str_path)
+
+    fprintf("Time to travel fastest path: %.2f minutes \n", times_in_minutes)
+
+    fprintf("Combined time spent driving: %.2f minutes ≈ %.2f days \n", time_spent, time_spent/(60*24))
+
 end
