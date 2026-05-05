@@ -34,6 +34,7 @@ func2run = [1 1 1 1];
 plot_    = 0;
 prints   = 1;
 
+% Defining matrices and edges
 A_time = zeros(n,n);
 A_capacity = zeros(n,n);
 s = zeros(m,1);
@@ -47,10 +48,10 @@ for i = 1:length(traffic)
     t(i) = k;
 end
 
-G_time = digraph(A_time);
 G_capacity = digraph(A_capacity);
-%plot_grapth_2(A_capacity,s,t,c,0)
-%plot(g)
+if plot_
+    plot_grapth_2(A_capacity,s,t,c,0)
+end
 
 traffic_flow = B*flow;
 ext_flow = sum(traffic_flow,2);
@@ -72,8 +73,10 @@ fprintf(int2str(max_flow))
 fprintf("\n \n")
 
 disp("Free Flow:")
-print_shortest_path(s,t,l,c,delay,zeros(m,1))
+print_shortest_path(s,t,l,c,delay,zeros(m,1),0);
 fprintf("\n")
+
+opt_time = 0;
 
 if func2run(1)
     cvx_begin quiet
@@ -91,7 +94,7 @@ if func2run(1)
 
     if prints
         disp("Social Optimum: ")
-        print_shortest_path(s,t,l,c,delay,f_opt)
+        opt_time = print_shortest_path(s,t,l,c,delay,f_opt,0);
         fprintf("\n")
     end
 end
@@ -112,7 +115,7 @@ if func2run(2)
 
     if prints
         disp("Wardrop Equilibrium: ")
-        print_shortest_path(s,t,l,c,delay,f_wardrop)
+        print_shortest_path(s,t,l,c,delay,f_wardrop,opt_time);
         fprintf("\n")
     end
 end
@@ -135,7 +138,7 @@ if func2run(3)
 
     if prints
         disp("Wardrop Equilibrium (with tolls): ")
-        print_shortest_path(s,t,l,c,delay,f_wardrop_tolls)
+        print_shortest_path(s,t,l,c,delay,f_wardrop_tolls, opt_time);
         total_diff = sum(abs(f_opt-f_wardrop_tolls));
         fprintf("Difference between Optimum and Wardrop with tolls: %.5f \n", total_diff)
         fprintf("\n")
@@ -173,7 +176,7 @@ if func2run(4)
 
     if prints
         disp("Wardrop Equilibrium (with tolls and addition delay): ")
-        print_shortest_path(s,t,l,c,delay,f_wardrop_tolls_add)
+        print_shortest_path(s,t,l,c,delay,f_wardrop_tolls_add,opt_time);
         total_diff_add = sum(abs(f_wardrop_tolls_add - f_opt_add));
         fprintf("Difference between Optimum and Wardrop with tolls and addition delay: %.5f \n", total_diff_add)
         fprintf("\n")
@@ -261,11 +264,12 @@ function plot_flow(G,f,s,t,c,show_cap)
     set(gca, 'color', 'none');
 end
 
-function print_shortest_path(s,t,l,c,delay,flow)
+function opt_time = print_shortest_path(s,t,l,c,delay,flow,time_opt)
     d = delay(l,c,flow);
     [path,time] = shortestpath(graph(s,t,d),1,17);
     times_in_minutes = 60*time;
     time_spent = sum(d.*flow)*60;
+    opt_time = time_spent;
 
     str_path = "";
     for i = path
@@ -277,5 +281,7 @@ function print_shortest_path(s,t,l,c,delay,flow)
     fprintf("Time to travel fastest path: %.2f minutes \n", times_in_minutes)
 
     fprintf("Combined time spent driving: %.2f minutes ≈ %.2f days \n", time_spent, time_spent/(60*24))
-
+    if time_opt
+        fprintf("Price of Anarchy: %.4f \n", time_spent/time_opt)
+    end
 end
