@@ -159,6 +159,14 @@ if func2run(4)
         plot_grapth_1(s,t,f_opt_add,c)
     end
 
+    opt_add_time = 0;
+
+    if prints
+        disp("Social Optimum (addition delay): ")
+        opt_add_time = print_shortest_path(s,t,l,c,delay,f_opt_add,0);
+        fprintf("\n")
+    end
+
     omega_add = f_opt_add.*delay_add_der(l,c,f_opt_add);
 
     cvx_begin quiet
@@ -176,7 +184,7 @@ if func2run(4)
 
     if prints
         disp("Wardrop Equilibrium (with tolls and addition delay): ")
-        print_shortest_path(s,t,l,c,delay,f_wardrop_tolls_add,opt_time);
+        print_shortest_path(s,t,l,c,delay,f_wardrop_tolls_add,opt_add_time);
         total_diff_add = sum(abs(f_wardrop_tolls_add - f_opt_add));
         fprintf("Difference between Optimum and Wardrop with tolls and addition delay: %.5f \n", total_diff_add)
         fprintf("\n")
