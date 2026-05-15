@@ -274,9 +274,11 @@ end
 
 function opt_time = print_shortest_path(s,t,l,c,delay,flow,time_opt)
     d = delay(l,c,flow);
+    d_add = delay(l,c,flow) - l;
     [path,time] = shortestpath(graph(s,t,d),1,17);
     times_in_minutes = 60*time;
     time_spent = sum(d.*flow)*60;
+    time_spent_add = sum(d_add.*flow)*60;
     opt_time = time_spent;
 
     str_path = "";
@@ -289,6 +291,8 @@ function opt_time = print_shortest_path(s,t,l,c,delay,flow,time_opt)
     fprintf("Time to travel fastest path: %.2f minutes \n", times_in_minutes)
 
     fprintf("Combined time spent driving: %.2f minutes ≈ %.2f days \n", time_spent, time_spent/(60*24))
+
+    fprintf("Combined additional time spent driving: %.2f minutes ≈ %.2f days \n", time_spent_add, time_spent_add/(60*24))
     if time_opt
         fprintf("Price of Anarchy: %.4f \n", time_spent/time_opt)
     end

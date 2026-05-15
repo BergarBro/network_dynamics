@@ -19,22 +19,29 @@ Tmax = 20;
 figure
 set(gcf,'color','white')
 
+node_count = 5;
 
-x = zeros(5,Tmax); % x is one for the current particle state
+x = zeros(node_count,Tmax); % x is one for the current particle state
 x(1,1) = 1; % starting state is node 1
-cords = [ 0 0
-          2 1
-          4 1
-          4 -1
-          2 -1];
+if fun
+    cords = round(rand(node_count,2)*2,1)*2;
+else
+    cords = [1 0
+             2 2
+             0 2
+             4 0
+             4 2];
+end
 
 % Transition probability matrix for the directed ring
-P = [0 1 0 0 0;
-     0 0 1 0 0;
-     0 0 0 1 0;
-     0 0 0 0 1;
-     1 0 0 0 0];
-
+W = [0 2 1 0 0;
+     1 0 5 0 1;
+     0 1 0 4 0;
+     0 0 6 0 1;
+     0 0 0 0 1];
+W = rand(node_count,node_count);
+omega = W*ones(node_count,1);
+P = diag(1./omega)*W;
 % Plot the graph and mark the node that the particle is in with red
 subplot(211)
 gplot(P,cords,'-k');
@@ -51,14 +58,17 @@ set(gca,'xtick',[],'ytick',[],'xcolor','w','ycolor','w')
 
 %---- Simulate the particle moving around ----%
 
-zzz = 1; % time that the particle waits in the node before moving
+zzz = 0; % time that the particle waits in the node before moving
          % on to the next one. Here we have just unit-time and no
          % randomness...   
 n = 1; %node that the particle is currently in
-%%
+%
 for i = 2:Tmax
-    n = 1 + mod(i-1,5); %move the particle 
-    x(n, i) = 1; %update the state vector
+    delta = P(x(:,i-1) == 1,:); %move the particle
+    inter = cumsum(delta);
+    r = rand(1);
+    idx = find(r <= inter,1);
+    x(idx, i) = 1; %update the state vector
     pause(zzz) % sleep for some time
     
     % plot the new location of the node
