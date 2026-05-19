@@ -43,6 +43,9 @@ all_colors = [1 0 0; 0 1 0; 0 0 1; 1 1 0; 1 0 1; 0 1 1; 1 1 1; 0 0 0];
 colors_rgb = all_colors(1:nbr_of_colors,:);
 colors = 1:nbr_of_colors;
 
+show_plot = 1;
+min_potential = 0;
+
 nodes = ones(nbr_of_nodes,1);
 eta = @(x) x/100;
 
@@ -50,7 +53,7 @@ W = zeros(nbr_of_nodes) + [zeros(nbr_of_nodes,1) [eye(nbr_of_nodes-1);zeros(1,nb
 x = 1:nbr_of_nodes;
 y = ones(nbr_of_nodes,1);
 
-plot_nodes(colors_rgb, nodes, eta, @isequal, W, x, y, nbr_of_nodes, nbr_of_colors, colors, 1, 0);
+plot_nodes(colors_rgb, nodes, eta, @isequal, W, x, y, nbr_of_nodes, nbr_of_colors, colors, show_plot, min_potential);
 
 %% Part 2.b
 
