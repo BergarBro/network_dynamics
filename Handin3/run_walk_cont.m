@@ -9,16 +9,12 @@ function [hittning_time_sim,hittning_time_th] = run_walk_cont(lambda,T_max,start
     
     x = zeros(node_count,T_max); % x is one for the current particle state
     x(start_node,1) = 1; % starting state is node 1
-    fun = 0;
-    if fun
-        cords = round(rand(node_count,2)*2,1)*2;
-    else
-        cords = [0 0.5
-                 1 1
-                 1 0
-                 2 0
-                 2 1];
-    end
+    names = ["o","a","b","c","d"];
+    cords = [0 0.5
+             1 1
+             1 0
+             2 0
+             2 1];
     
     % Transition probability matrix for the directed ring
     omega = lambda*ones(node_count,1);
@@ -55,12 +51,24 @@ function [hittning_time_sim,hittning_time_th] = run_walk_cont(lambda,T_max,start
         for i = 1:5
             if x(i, 1) == 1
                 scatter(cords(i,1),cords(i,2),200,'markeredgecolor','k','markerfacecolor', 'r');
-                %quiver(cords(1,1),cords(1,2),cords(2,1),cords(2,2),"off")
-                %pause(100)
             else
                 scatter(cords(i,1),cords(i,2),200,'markeredgecolor','k','markerfacecolor', 'w');
             end
-        
+        end
+        [ind_i,ind_j] = ind2sub(size(lambda),find(lambda));
+        for k = 1:length(ind_i)
+            x_start = cords(ind_i(k),1);
+            y_start = cords(ind_i(k),2);
+            x_end = cords(ind_j(k),1);
+            y_end = cords(ind_j(k),2);
+            x_dir = x_end - x_start;
+            y_dir = y_end - y_start;
+            if x_dir == 0
+                scale = 0.92;
+            else 
+                scale = 0.95;
+            end
+            quiver(x_start,y_start,x_dir,y_dir,scale,"black","LineWidth",1)
         end
         set(gca,'xtick',[],'ytick',[],'xcolor','w','ycolor','w')
     end
@@ -85,10 +93,19 @@ function [hittning_time_sim,hittning_time_th] = run_walk_cont(lambda,T_max,start
                 else
                     scatter(cords(k,1),cords(k,2),200,'markeredgecolor','k','markerfacecolor', 'w');
                 end
+                text(cords(k,1), cords(k,2), sprintf('%s', names(k)), ...
+                'HorizontalAlignment', 'center', ...
+                'VerticalAlignment', 'middle', ...
+                'FontSize', 12, ...
+                'FontWeight', 'bold');
             end
             subplot(212)
             tvec = [0 1:i];
             plot(tvec(1:end-1),(x(:, 1:i)'*[1 2 3 4 5]'), '-o')
+            ylabel("Nodes")
+            yticks([1 2 3 4 5])
+            yticklabels(names)
+            xlabel("Timesteps")
         end
         if (idx == end_node) && (any(x(start_node,1:i) == 0))
             hittning_time_sim = time_elapsed;

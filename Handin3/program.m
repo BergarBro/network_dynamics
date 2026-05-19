@@ -8,26 +8,30 @@ lambda = [ 0  2/5 1/5  0   0 ;
           1/2  0   0  1/2  0 ;
            0   0  1/3  0  2/3;
            0  1/3  0  1/3  0 ];
-for j = 1
-    start_node = 1;
-    end_node = 5;
-    sleep_time = 0;
-    plot_visualizaer = 1;
-    times = 1;
-    time_acc = 0;
-    max_time = 0;
-    for i = 1:times
-        [hitting_time_sim,hitting_time_th] = run_walk_cont(lambda,1000,start_node,end_node,sleep_time,plot_visualizaer);
-        time_acc = time_acc + hitting_time_sim;
-        max_time = max(max_time,hitting_time_sim);
-    end
-    average_hittning_time_sim = time_acc/times
-    hitting_time_th
-    radio = average_hittning_time_sim/hitting_time_th
-    max_time
-end
 
-%% Part 2
+start_node = 1;
+end_node = 5;
+sleep_time = 0;
+plot_visualizaer = 1;
+times = 1;
+
+
+time_acc = 0;
+max_time = 0;
+for i = 1:times
+    [hitting_time_sim,hitting_time_th] = run_walk_cont(lambda,1000,start_node,end_node,sleep_time,plot_visualizaer);
+    time_acc = time_acc + hitting_time_sim;
+    max_time = max(max_time,hitting_time_sim);
+end
+average_hittning_time_sim = time_acc/times;
+fprintf("Simulated Return/Hitting Time: %f \n", round(average_hittning_time_sim,4))
+fprintf("Theretical Return/Hitting Time: %f \n", round(hitting_time_th,4))
+radio = average_hittning_time_sim/hitting_time_th;
+fprintf("Ratio: %f \n", round(radio,4))
+fprintf("Maximum Return/Hitting Time: %f \n",max_time)
+
+
+%% Part 2.a
 
 clc
 clear
@@ -36,21 +40,19 @@ close all
 nbr_of_colors = 2;
 nbr_of_nodes = 10;
 all_colors = [1 0 0; 0 1 0; 0 0 1; 1 1 0; 1 0 1; 0 1 1; 1 1 1; 0 0 0];
-%colors = all_colors(randperm(length(all_colors),nbr_of_colors),:);
 colors_rgb = all_colors(1:nbr_of_colors,:);
 colors = 1:nbr_of_colors;
 
 nodes = ones(nbr_of_nodes,1);
-eta = @(x) 10;
+eta = @(x) x/100;
 
 W = zeros(nbr_of_nodes) + [zeros(nbr_of_nodes,1) [eye(nbr_of_nodes-1);zeros(1,nbr_of_nodes-1)]] + [zeros(nbr_of_nodes,1) [eye(nbr_of_nodes-1);zeros(1,nbr_of_nodes-1)]]';
 x = 1:nbr_of_nodes;
 y = ones(nbr_of_nodes,1);
 
-plot_nodes(colors_rgb, nodes, eta, @isequal, W, x, y, nbr_of_nodes, nbr_of_colors, colors)
+plot_nodes(colors_rgb, nodes, eta, @isequal, W, x, y, nbr_of_nodes, nbr_of_colors, colors, 1, 0);
 
-%%
-% part 2.b
+%% Part 2.b
 
 clc
 clear
@@ -61,40 +63,44 @@ load('data/coord.mat','-ascii')
 
 x = coord(:,1);
 y = coord(:,2);
+W = wifi;
 
-nbr_of_colors = 8;
-nbr_of_nodes = length(wifi);
-all_colors = [1 0 0; 0 1 0; 0 0 1; 1 1 0; 1 0 1; 0 1 1; 1 1 1; 0 0 0];
-colors_rgb = all_colors(1:nbr_of_colors,:);
-colors = 1:nbr_of_colors;
-
-nodes = ones(nbr_of_nodes,1);
 eta_b = @(x) x/100;
 eta_1 = @(x) x/1000;
 eta_2 = @(x) 50;
-eta_3 = @(x) 50/(1+exp(-x*0.5+100));
+eta_3 = @(x) 50/(1+exp(0.5*(100-x)));
 eta = {eta_b,eta_1,eta_2,eta_3};
-W = wifi;
-res_time_steps = zeros(4,1);
-res_u = zeros(4,1);
-times = 20;
-%[time_steps, u_t] = plot_nodes(colors_rgb, nodes, eta_1, @custom_c_1, W, x, y, nbr_of_nodes, nbr_of_colors, colors, 0)
-for j = 1:4
-    e = eta{j};
-    acc_time = 0;
-    acc_u = 0;
-    for i = 1:times
-        [time_steps, u_t] = plot_nodes(colors_rgb, nodes, e, @custom_c_1, W, x, y, nbr_of_nodes, nbr_of_colors, colors, 0);
-        acc_time = acc_time + time_steps;
-        acc_u = acc_u + u_t;
-    end
-    res_time_steps(j) = acc_time/times;
-    res_u(j) = acc_u/times;
-end
-res_u
-res_time_steps
+all_colors = [1 0 0; 0 1 0; 0 0 1; 1 1 0; 1 0 1; 0 1 1; 1 1 1; 0 0 0];
 
-function [time_steps, u_t] = plot_nodes(colors_rgb, nodes, eta, c, W, x, y, nbr_of_nodes, nbr_of_colors, colors, show_plot)
+nbr_of_colors = 8;
+nbr_of_nodes = length(wifi);
+colors_rgb = all_colors(1:nbr_of_colors,:);
+colors = 1:nbr_of_colors;
+show_plot = 0;
+min_potential = 4;
+times = 1;                    % Times to run the simulation
+nodes = ones(nbr_of_nodes,1); % Initial state
+
+nbr_of_eta = length(eta);
+all_u = zeros(times,nbr_of_eta);
+all_time_steps = zeros(times,nbr_of_eta);
+for j = 1:nbr_of_eta
+    e = eta{j};
+    for i = 1:times
+        [all_u(i,j), all_time_steps(i,j)] = plot_nodes(colors_rgb, nodes, e, @custom_c, W, x, y, nbr_of_nodes, nbr_of_colors, colors, show_plot, min_potential);
+    end
+end
+res_u = mean(all_u,1);
+res_time_steps = mean(all_time_steps,1);
+
+fprintf("\nTimes Run: %d \n" ,times)
+for j = 1:nbr_of_eta
+    fprintf("Using %s(x) = %s \n",char(951),func2str(eta{j}))
+    fprintf("Avrages Min Potential: %f \n",round(res_u(j),2))
+    fprintf("Avrages Timesteps: %f \n \n",round(res_time_steps(j),2))
+end
+
+function [u_t, time_steps] = plot_nodes(colors_rgb, nodes, eta, c, W, x, y, nbr_of_nodes, nbr_of_colors, colors, show_plot,best_value)
     close all
     G = graph(W);
     scale = 0.7;
@@ -149,10 +155,9 @@ function [time_steps, u_t] = plot_nodes(colors_rgb, nodes, eta, c, W, x, y, nbr_
                 drawnow;
             end
         end
-        %pause(0.01)
-        u(t) = utility(W,nodes,colors,c);
+        u(t) = utility(W,nodes,c);
         span = 100;
-        if (u(t) == 0)||(t>span)&&(sum(abs(diff(u(t-span:t))))==0)||(t>20000)
+        if (u(t) == 0)||(t>span)&&(sum(abs(diff(u(t-span:t))))==0)||(t>20000)||(u(t)==best_value)
             if show_plot
                 subplot(2,2,2)
                 [counts,edges] = histcounts(nodes);
@@ -178,25 +183,11 @@ function [time_steps, u_t] = plot_nodes(colors_rgb, nodes, eta, c, W, x, y, nbr_
     fprintf("Timestep: %i  U_t: %d \n", t, u_t);
 end
 
-function c = custom_c_1(x,y)
-    if (x == y)
-        c = 2;
-    else 
-        d = abs(x-y);
-        if d == 1
-            c = 1;
-        else
-            c = 0;
-        end
-    end
+function c = custom_c(x,y)
+    c = max(0,2-abs(x-y));
 end
 
-function c = custom_c_2(x,y)
-    d = abs(x-y);
-    c = 2*exp(-d);
-end
-
-function u = utility(W,nodes,colors,c)
+function u = utility(W,nodes,c)
     acc = 0;
     for i = 1:length(nodes)
         acc = acc + sum_neighbors(W,nodes,i,nodes(i),c);
@@ -219,10 +210,4 @@ function value = sum_neighbors(W,nodes,chosen_node,new_color,c)
         acc = acc + W(chosen_node,j)*c(nodes(j),new_color);
     end
     value = acc;
-end
-
-function change_color(p,nodes,i,new_color,colors_rgb)
-    nodes(i,:) = new_color;
-    p.NodeColor = colors_rgb(nodes,:);
-    drawnow;
 end
